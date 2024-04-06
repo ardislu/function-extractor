@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:,">
+  <title>Function Extractor</title>
+  <style>
+    body {
+      background: hsl(216deg 50% 93%);
+      font-family: monospace;
+      inline-size: min(1440px, 100% - 16px);
+      margin-inline: auto;
+    }
+
+    header {
+      margin-block-end: 32px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 2rem;
+    }
+
+    ul {
+      margin: 0;
+      padding: 0;
+      list-style-type: none;
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    li:not(:last-child)::after {
+      content: '|';
+      content: '|' / '';
+      padding: 8px;
+    }
+
+    a,
+    input,
+    textarea {
+      font-size: 1rem;
+    }
+
+    a {
+      border: 1px solid transparent;
+      border-radius: 4px;
+      transition: border 400ms;
+    }
+
+    form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    label {
+      font-size: 1.25rem;
+      font-weight: 700;
+    }
+
+    label:not(:first-child) {
+      margin-block-start: 16px;
+    }
+
+    label[for="functions"],
+    #functions {
+      display: none;
+    }
+
+    textarea:not(:invalid)~:is(label[for="functions"], #functions) {
+      display: unset;
+    }
+
+    input,
+    textarea {
+      font-family: inherit;
+      padding: 6px;
+      border-radius: 4px;
+      border: 1px solid hsl(216deg 50% 80%);
+      transition: border 400ms;
+    }
+
+    textarea {
+      align-self: center;
+      min-inline-size: calc(100% - 16px);
+      max-inline-size: calc(100vi - 32px);
+      min-block-size: 10rem;
+    }
+
+    :is(a, input, textarea):is(:hover, :focus-within) {
+      border: 1px solid hsl(216deg 50% 65%);
+      transition: border 200ms;
+    }
+
+    :is(input, textarea):focus {
+      outline: 1px solid hsl(216deg 50% 50%);
+    }
+
+    output {
+      overflow: auto;
+    }
+
+    table {
+      border-collapse: collapse;
+      font-size: 1rem;
+    }
+
+    tr {
+      transition: background-color 400ms;
+    }
+
+    tr:hover,
+    tr:focus-within {
+      background: hsl(222deg 50% 90%);
+      transition: background-color 200ms;
+    }
+
+    th,
+    td {
+      line-height: 2;
+      padding-block: 8px;
+      padding-inline: 4px 16px;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Function Extractor</h1>
+    <ul>
+      <li><a href="https://github.com/ardislu/function-extractor">ardislu/function-extractor</a></li>
+      <li><a href="https://openchain.xyz/">openchain.xyz</a></li>
+      <li><a href="https://github.com/cdump/evmole">cdump/evmole</a></li>
+    </ul>
+  </header>
+
+  <main>
+    <form>
+      <label for="rpc">RPC</label>
+      <input type="url" name="rpc" id="rpc" placeholder="https://1rpc.io/eth" value="https://1rpc.io/eth">
+
+      <label for="contract">Contract address</label>
+      <input name="contract" id="contract" placeholder="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" value="0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48" autocomplete="off" data-1p-ignore data-lpignore="true" data-form-type="other" data-bwignore>
+
+      <label for="bytecode">Runtime bytecode</label>
+      <textarea name="bytecode" id="bytecode" placeholder="0x60606040..." required></textarea>
+
+      <label for="functions">Extracted functions</label>
+      <output name="functions" id="functions">
+        <table>
+          <thead>
+            <tr>
+              <th>Selector</th>
+              <th>Name</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </output>
+    </form>
+  </main>
+
+  <script type="module">
+    const form = document.querySelector('form');
+    const rpcInput = document.querySelector('#rpc');
+    const contractInput = document.querySelector('#contract');
+    const bytecodeInput = document.querySelector('#bytecode');
+    const tableBody = document.querySelector('tbody');
+
+    // https://twitter.com/high_byte/status/1606634118808223747
+    function getFunctionSelectors(bytecode) {
+      return [...bytecode.matchAll(/63([0-9a-f]{8})1461([0-9a-f]{4})57/ig)].map(g => `0x${g[1]}`);
+    }
+
+    async function getSelectorNames(selectors) {
+      const endpoint = 'https://api.openchain.xyz/signature-database/v1/lookup';
+      const params = new URLSearchParams({ function: selectors.join(',') });
+      const obj = await fetch(`${endpoint}?${params}`).then(r => r.json());
+
+      const out = {};
+      for (const [key, arr] of Object.entries(obj.result.function)) {
+        out[key] = arr?.[0].name ?? 'No name found.';
+      }
+      return out;
+    }
+
+    function debounce(fn, wait) {
+      let timeoutId;
+      return () => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(fn, wait);
+      }
+    }
+
+    contractInput.addEventListener('input', debounce(async () => {
+      // Do nothing if either RPC input or contract input are invalid
+      try { new URL(rpcInput.value); } catch { return; }
+      if (!/(0x)?[0-9a-f]{40}/i.test(contractInput.value)) { return; }
+
+      const bytecode = await fetch(rpcInput.value, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'eth_getCode',
+          params: [contractInput.value, 'latest']
+        })
+      })
+        .then(r => r.json())
+        .then(obj => obj.result);
+
+      bytecodeInput.value = bytecode;
+      form.requestSubmit();
+    }, 250));
+
+    bytecodeInput.addEventListener('change', debounce(() => {
+      form.requestSubmit();
+    }, 250));
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+
+      const selectors = getFunctionSelectors(bytecodeInput.value);
+      const names = await getSelectorNames(selectors);
+
+      tableBody.innerHTML = '';
+      for (const [selector, name] of Object.entries(names)) {
+        tableBody.insertAdjacentHTML('beforeend', `<tr><td>${selector}</td><td>${name}</td></tr>`);
+      }
+    });
+
+    // Set initial bytecode from prepopulated contract
+    contractInput.dispatchEvent(new Event('input'));
+  </script>
+</body>
+
+</html>
