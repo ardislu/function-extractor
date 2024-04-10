@@ -6,3 +6,6 @@ Source for the regex used to extract the 4-byte function selectors: [https://twi
 
 Similar projects:
 - [EVMole](https://github.com/cdump/evmole)
+- [WhatsABI](https://github.com/shazow/whatsabi)
+- [EVM Hound](https://github.com/g00dv1n/evm-hound-rs)
+- [Heimdall](https://github.com/Jon-Becker/heimdall-rs)
