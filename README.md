@@ -4,6 +4,8 @@ This is a minimal web app that extracts 4-byte function selectors from a smart c
 
 Source for the regex used to extract the 4-byte function selectors: [https://twitter.com/high_byte/status/1606634118808223747](https://twitter.com/high_byte/status/1606634118808223747)
 
+Code repository mirrors: [GitHub](https://github.com/ardislu/function-extractor), [Codeberg](https://codeberg.org/ardislu/function-extractor), [git.ardis.lu](https://git.ardis.lu/function-extractor)
+
 Similar projects:
 - [EVMole](https://github.com/cdump/evmole)
 - [WhatsABI](https://github.com/shazow/whatsabi)
